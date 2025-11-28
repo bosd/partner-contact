@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Add KYC category filter to identification number search view -->
+    <record id="view_identification_number_kyc_filter" model="ir.ui.view">
+        <field name="name">res.partner.id_number.kyc.filter</field>
+        <field name="model">res.partner.id_number</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter
+                    name="kyc_category_filter"
+                    string="KYC"
+                    domain="[('category_id.code', '=', 'KYC')]"
+                />
+                <separator />
+            </search>
+        </field>
+    </record>
+</odoo>
