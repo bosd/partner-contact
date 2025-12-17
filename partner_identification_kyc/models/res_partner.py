@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -35,7 +35,57 @@ class ResPartner(models.Model):
         }
 
         for partner in self:
-            partner.show_kyc_button = partner.id not in ongoing_kyc_partner_ids
+            show_button = True
+            if not kyc_category.enable_on_child_contacts and not partner.is_company:
+                show_button = False
+
+            if partner.id in ongoing_kyc_partner_ids:
+                show_button = False
+
+            partner.show_kyc_button = show_button
+
+    kyc_valid_until = fields.Date(
+        string="KYC Valid Until",
+        compute="_compute_kyc_valid_until",
+        store=True,
+    )
+
+    @api.depends(
+        "id_numbers.valid_until", "id_numbers.category_id", "id_numbers.status"
+    )
+    def _compute_kyc_valid_until(self):
+        kyc_category = self.env.ref(
+            "partner_identification_kyc.kyc_identification_category",
+            raise_if_not_found=False,
+        )
+        for partner in self:
+            valid_until_date = False
+            if kyc_category:
+                kyc_records = partner.id_numbers.filtered(
+                    lambda r: r.category_id == kyc_category and r.status == "open"
+                )
+                if kyc_records:
+                    valid_until_date = min(
+                        rec.valid_until for rec in kyc_records if rec.valid_until
+                    )
+            partner.kyc_valid_until = valid_until_date
+
+    def action_view_kyc_records(self):
+        self.ensure_one()
+        kyc_category = self.env.ref(
+            "partner_identification_kyc.kyc_identification_category",
+            raise_if_not_found=False,
+        )
+        return {
+            "name": "KYC Records",
+            "type": "ir.actions.act_window",
+            "res_model": "res.partner.id_number",
+            "view_mode": "list,form",
+            "domain": [
+                ("partner_id", "=", self.id),
+                ("category_id", "=", kyc_category.id if kyc_category else False),
+            ],
+        }
 
     def _create_kyc_record(self, partner):
         """Private helper method to create a new KYC identification record."""

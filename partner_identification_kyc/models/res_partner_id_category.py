@@ -1,0 +1,12 @@
+from odoo import fields, models
+
+
+class ResPartnerIdCategory(models.Model):
+    _inherit = "res.partner.id_category"
+
+    enable_on_child_contacts = fields.Boolean(
+        string="Enable on Child Contacts",
+        default=False,
+        help="If checked, KYC checks can be performed on child contacts of a company.",
+    )
+    responsible_id = fields.Many2one("res.users", string="Responsible")

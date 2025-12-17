@@ -146,7 +146,7 @@ Credits
 =======
 
 Contributors
-~~~~~~~~~~~~
+------------
 
 -  OCA Community
 -  Emiel van Bokhoven
