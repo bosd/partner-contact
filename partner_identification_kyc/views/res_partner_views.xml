@@ -22,16 +22,18 @@
                     </div>
                 </button>
             </xpath>
-            <xpath expr="//header" position="inside">
-                <button
-                    name="action_request_kyc"
-                    type="object"
-                    string="Request KYC"
-                    class="oe_highlight"
-                    icon="fa-user-secret"
-                    invisible="not show_kyc_button"
-                />
-            </xpath>
+            <sheet position="before">
+                <header>
+                    <button
+                        name="action_request_kyc"
+                        type="object"
+                        string="Request KYC"
+                        class="oe_highlight"
+                        icon="fa-user-secret"
+                        invisible="not show_kyc_button"
+                    />
+                </header>
+            </sheet>
         </field>
     </record>
 </odoo>
