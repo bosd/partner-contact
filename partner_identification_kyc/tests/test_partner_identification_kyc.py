@@ -1,4 +1,5 @@
 import odoo
+from odoo import fields
 from odoo.tests import common
 
 
@@ -468,3 +469,455 @@ class TestPartnerIdentificationKYC(common.TransactionCase):
         test_partner_3.invalidate_recordset()
         reloaded_partner = test_partner_3.browse(test_partner_3.id)
         self.assertTrue(reloaded_partner.show_kyc_button)
+
+    def test_kyc_valid_until_computed_field_with_valid_dates(self):
+        """Test the kyc_valid_until computed field when records have valid dates."""
+        # Create KYC record with a valid_until date
+        identification_model = self.env["res.partner.id_number"]
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-WITH-DATE",
+                "status": "open",
+                "valid_until": "2025-12-31",  # Set a future date
+            }
+        )
+
+        # Reload partner to get updated computed field
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should have a valid_until date
+        self.assertIsNotNone(reloaded_partner.kyc_valid_until)
+        self.assertEqual(
+            reloaded_partner.kyc_valid_until, fields.Date.from_string("2025-12-31")
+        )
+
+    def test_kyc_valid_until_computed_field_multiple_records(self):
+        """Test the kyc_valid_until computed field with multiple records
+        to get min date."""
+        identification_model = self.env["res.partner.id_number"]
+
+        # Create multiple KYC records with different valid_until dates
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-DATE1",
+                "status": "open",
+                "valid_until": "2025-12-31",  # Later date
+            }
+        )
+
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-DATE2",
+                "status": "open",
+                "valid_until": "2025-06-15",  # Earlier date - should be the min
+            }
+        )
+
+        # Reload partner to get updated computed field
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should have the minimum (earliest) valid_until date
+        self.assertIsNotNone(reloaded_partner.kyc_valid_until)
+        self.assertEqual(
+            reloaded_partner.kyc_valid_until, fields.Date.from_string("2025-06-15")
+        )
+
+    def test_kyc_valid_until_computed_field_no_open_records(self):
+        """Test the kyc_valid_until computed field when no open records exist."""
+        # Create a KYC record but with 'draft' status (not 'open')
+        identification_model = self.env["res.partner.id_number"]
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-DRAFT",
+                "status": "draft",  # Not 'open' status
+            }
+        )
+
+        # Reload partner to get updated computed field
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should be False since there are no 'open' status records
+        self.assertFalse(reloaded_partner.kyc_valid_until)
+
+    def test_kyc_valid_until_computed_field_open_records_without_dates(self):
+        """Test the kyc_valid_until computed field when open records
+        have no valid_until dates."""
+        identification_model = self.env["res.partner.id_number"]
+
+        # Create KYC record with 'open' status but no valid_until date
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-NO-DATE",
+                "status": "open",  # Open status but no valid_until
+            }
+        )
+
+        # Reload partner to get updated computed field
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should be False since there are no valid_until dates in open records
+        self.assertFalse(reloaded_partner.kyc_valid_until)
+
+    def test_kyc_valid_until_computed_field_mixed_records(self):
+        """Test the kyc_valid_until computed field with mixed records
+        (some with dates, some without)."""
+        identification_model = self.env["res.partner.id_number"]
+
+        # Create one record with valid_until and one without
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-WITH-DATE",
+                "status": "open",
+                "valid_until": "2025-12-31",
+            }
+        )
+
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-NO-DATE",
+                "status": "open",
+                # No valid_until field
+            }
+        )
+
+        # Reload partner to get updated computed field
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should have the valid_until from the record that has it
+        self.assertIsNotNone(reloaded_partner.kyc_valid_until)
+        self.assertEqual(
+            reloaded_partner.kyc_valid_until, fields.Date.from_string("2025-12-31")
+        )
+
+    def test_show_kyc_button_with_company_partner(self):
+        """Test show_kyc_button computed field with company partner
+        when child contacts disabled."""
+        # First, disable child contacts on the KYC category
+        self.kyc_category.enable_on_child_contacts = False
+
+        # Create a company partner (should still be able to see button
+        # regardless of enable_on_child_contacts)
+        company_partner = self.env["res.partner"].create(
+            {
+                "name": "Company Partner",
+                "email": "company@example.com",
+                "is_company": True,  # Is a company
+            }
+        )
+
+        # The button should be visible for companies even when
+        # enable_on_child_contacts is False
+        company_partner.invalidate_recordset()
+        reloaded_company = company_partner.browse(company_partner.id)
+        self.assertTrue(reloaded_company.show_kyc_button)
+
+    def test_button_visibility_computed_field_with_disabled_child_contacts(self):
+        """Test the computed field show_kyc_button when child contacts are disabled."""
+        # First, disable child contacts on the KYC category
+        self.kyc_category.enable_on_child_contacts = False
+
+        # Create a non-company partner (individual contact)
+        individual_contact = self.env["res.partner"].create(
+            {
+                "name": "Individual Contact",
+                "email": "individual@example.com",
+                "is_company": False,  # Not a company
+            }
+        )
+
+        # The button should be hidden for individual contacts when
+        # enable_on_child_contacts is False
+        individual_contact.invalidate_recordset()
+        reloaded_contact = individual_contact.browse(individual_contact.id)
+        self.assertFalse(reloaded_contact.show_kyc_button)
+
+    def test_button_visibility_computed_field_with_enabled_child_contacts(self):
+        """Test the computed field show_kyc_button when child contacts are enabled."""
+        # Ensure child contacts are enabled on the KYC category (default)
+        self.kyc_category.enable_on_child_contacts = True
+
+        # Create a non-company partner (individual contact)
+        individual_contact = self.env["res.partner"].create(
+            {
+                "name": "Individual Contact",
+                "email": "individual@example.com",
+                "is_company": False,  # Not a company
+            }
+        )
+
+        # The button should be visible for individual contacts when
+        # enable_on_child_contacts is True
+        individual_contact.invalidate_recordset()
+        reloaded_contact = individual_contact.browse(individual_contact.id)
+        self.assertTrue(reloaded_contact.show_kyc_button)
+
+    def test_kyc_valid_until_computed_field_empty_sequence_edge_case(self):
+        """Test that kyc_valid_until doesn't fail when open records exist
+        but none have valid_until."""
+        # Create multiple open records without valid_until dates
+        # to test the min() edge case
+        identification_model = self.env["res.partner.id_number"]
+
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-NO-DATE-1",
+                "status": "open",
+                # No valid_until
+            }
+        )
+
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-TEST-NO-DATE-2",
+                "status": "open",
+                # No valid_until
+            }
+        )
+
+        # This should not raise an error and should return False
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should be False since no records have valid_until dates
+        self.assertFalse(reloaded_partner.kyc_valid_until)
+
+    def test_action_request_kyc_with_custom_sequence(self):
+        """Test action_request_kyc creates record with proper sequence."""
+        # Remove any existing KYC records first
+        existing_records = self.env["res.partner.id_number"].search(
+            [
+                ("partner_id", "=", self.test_partner.id),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+        existing_records.unlink()
+
+        # Call action_request_kyc
+        self.test_partner.action_request_kyc()
+
+        # Check that a record was created
+        kyc_records = self.env["res.partner.id_number"].search(
+            [
+                ("partner_id", "=", self.test_partner.id),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+
+        self.assertEqual(len(kyc_records), 1)
+        self.assertEqual(kyc_records[0].status, "draft")
+        self.assertTrue(kyc_records[0].name.startswith("KYC-"))
+
+    def test_ensure_kyc_record_when_none_exist(self):
+        """Test ensure_kyc_record creates record when none exists."""
+        # Remove any existing KYC records first
+        existing_records = self.env["res.partner.id_number"].search(
+            [
+                ("partner_id", "=", self.test_partner.id),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+        existing_records.unlink()
+
+        # Call ensure_kyc_record
+        self.test_partner.ensure_kyc_record()
+
+        # Check that a record was created
+        kyc_records = self.env["res.partner.id_number"].search(
+            [
+                ("partner_id", "=", self.test_partner.id),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+
+        self.assertEqual(len(kyc_records), 1)
+        self.assertEqual(kyc_records[0].status, "draft")
+
+    def test_ensure_kyc_record_when_exists_with_active_status(self):
+        """Test ensure_kyc_record does nothing when active record exists."""
+        # Create an existing 'open' status record
+        identification_model = self.env["res.partner.id_number"]
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-EXISTING-TEST",
+                "status": "open",
+            }
+        )
+
+        # Count existing records
+        initial_count = self.env["res.partner.id_number"].search_count(
+            [
+                ("partner_id", "=", self.test_partner.id),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+
+        # Call ensure_kyc_record - should not create a new record
+        self.test_partner.ensure_kyc_record()
+
+        # Count should remain the same
+        final_count = self.env["res.partner.id_number"].search_count(
+            [
+                ("partner_id", "=", self.test_partner.id),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+
+        self.assertEqual(initial_count, final_count)
+
+    def test_action_view_kyc_records(self):
+        """Test action_view_kyc_records returns proper action."""
+        # Create a KYC record first
+        identification_model = self.env["res.partner.id_number"]
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-VIEW-TEST",
+                "status": "open",
+            }
+        )
+
+        # Call action_view_kyc_records
+        action = self.test_partner.action_view_kyc_records()
+
+        # Check the action structure
+        self.assertEqual(action["type"], "ir.actions.act_window")
+        self.assertEqual(action["res_model"], "res.partner.id_number")
+        self.assertIn("domain", action)
+
+        # Check that domain contains partner_id filter
+        domain_has_partner = any(
+            isinstance(d, (list, tuple))
+            and len(d) >= 3
+            and d[0] == "partner_id"
+            and d[1] == "="
+            and d[2] == self.test_partner.id
+            for d in action["domain"]
+        )
+        self.assertTrue(domain_has_partner)
+
+    def test_kyc_valid_until_with_expired_and_active_records(self):
+        """Test kyc_valid_until with mix of expired and active records."""
+        identification_model = self.env["res.partner.id_number"]
+
+        # Create an expired record (close status) with a date
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-EXPIRED-TEST",
+                "status": "close",  # Not 'open' status, should be ignored
+                "valid_until": "2020-01-01",  # Past date
+            }
+        )
+
+        # Create an open record with a future date
+        identification_model.create(
+            {
+                "partner_id": self.test_partner.id,
+                "category_id": self.kyc_category.id,
+                "name": "KYC-ACTIVE-TEST",
+                "status": "open",  # This one should be considered
+                "valid_until": "2025-12-31",  # Future date
+            }
+        )
+
+        # Reload partner to get updated computed field
+        self.test_partner.invalidate_recordset()
+        reloaded_partner = self.test_partner.browse(self.test_partner.id)
+
+        # Should only consider 'open' status records
+        self.assertIsNotNone(reloaded_partner.kyc_valid_until)
+        expected_date = fields.Date.from_string("2025-12-31")
+        self.assertEqual(reloaded_partner.kyc_valid_until, expected_date)
+
+    def test_button_visibility_with_multiple_partners(self):
+        """Test show_kyc_button computed field with multiple partners at once."""
+        # Create multiple partners
+        partner1 = self.env["res.partner"].create(
+            {
+                "name": "Partner 1",
+                "email": "partner1@example.com",
+            }
+        )
+
+        partner2 = self.env["res.partner"].create(
+            {
+                "name": "Partner 2",
+                "email": "partner2@example.com",
+            }
+        )
+
+        # Get multiple partners at once to test computed field batch processing
+        partners = partner1 | partner2
+
+        # All should have button visible initially (no KYC records)
+        partners.invalidate_recordset()
+        for partner in partners:
+            self.assertTrue(partner.show_kyc_button)
+
+    def test_ensure_kyc_record_batch_processing(self):
+        """Test ensure_kyc_record works with multiple partners."""
+        # Create multiple partners
+        partner1 = self.env["res.partner"].create(
+            {
+                "name": "Batch Partner 1",
+                "email": "batch1@example.com",
+            }
+        )
+
+        partner2 = self.env["res.partner"].create(
+            {
+                "name": "Batch Partner 2",
+                "email": "batch2@example.com",
+            }
+        )
+
+        # Remove any existing KYC records for these partners
+        existing_records = self.env["res.partner.id_number"].search(
+            [
+                ("partner_id", "in", [partner1.id, partner2.id]),
+                ("category_id", "=", self.kyc_category.id),
+            ]
+        )
+        existing_records.unlink()
+
+        # Apply ensure_kyc_record to multiple partners at once
+        partners = partner1 | partner2
+        partners.ensure_kyc_record()
+
+        # Each partner should now have a KYC record
+        for partner in partners:
+            partner_records = self.env["res.partner.id_number"].search(
+                [
+                    ("partner_id", "=", partner.id),
+                    ("category_id", "=", self.kyc_category.id),
+                ]
+            )
+            self.assertEqual(len(partner_records), 1)
+            self.assertEqual(partner_records[0].status, "draft")

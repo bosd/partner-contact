@@ -61,12 +61,12 @@ Identification Category
 The module automatically creates a "KYC" identification category with
 the following default settings:
 
--  Initial Activity Type: "Perform KYC Check"
--  Renew Activity Type: "Perform KYC Check"
--  Create Activity on New: True
--  Default Validity: 1 year
--  Renewal Lead Number: 2
--  Renewal Lead Unit: Months
+- Initial Activity Type: "Perform KYC Check"
+- Renew Activity Type: "Perform KYC Check"
+- Create Activity on New: True
+- Default Validity: 1 year
+- Renewal Lead Number: 2
+- Renewal Lead Unit: Months
 
 Activity Types
 ~~~~~~~~~~~~~~
@@ -89,15 +89,15 @@ Request KYC Button
 
 On the partner form, a "Request KYC" button will appear when:
 
--  There is no KYC identification record in the 'new', 'running', or
-   'to_renew' states
--  OR there is no ID number record of the KYC category at all
+- There is no KYC identification record in the 'new', 'running', or
+  'to_renew' states
+- OR there is no ID number record of the KYC category at all
 
 The button will be hidden if:
 
--  There is a 'running' or 'to_renew' KYC record
--  OR there is already a 'new' status KYC record (to prevent redundant
-   records)
+- There is a 'running' or 'to_renew' KYC record
+- OR there is already a 'new' status KYC record (to prevent redundant
+  records)
 
 Clicking the button will create a new KYC identification record in the
 'new' status, triggering the associated activity for KYC officers to
@@ -126,11 +126,11 @@ Changelog
 Added
 ~~~~~
 
--  Initial implementation of KYC identification category
--  "Request KYC" button on partner form
--  API function to trigger KYC flow for API-created partners
--  Dedicated "Perform KYC Check" activity type
--  Filters for KYC category in id_numbers views
+- Initial implementation of KYC identification category
+- "Request KYC" button on partner form
+- API function to trigger KYC flow for API-created partners
+- Dedicated "Perform KYC Check" activity type
+- Filters for KYC category in id_numbers views
 
 Bug Tracker
 ===========
@@ -148,8 +148,8 @@ Credits
 Contributors
 ------------
 
--  OCA Community
--  Emiel van Bokhoven
+- OCA Community
+- Emiel van Bokhoven
 
 Maintainers
 -----------

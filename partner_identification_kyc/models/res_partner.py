@@ -7,7 +7,10 @@ class ResPartner(models.Model):
 
     # Computed field to determine if the KYC button should be visible
     show_kyc_button = fields.Boolean(
-        string="Show KYC Button", compute="_compute_show_kyc_button", store=False
+        string="Show KYC Button",
+        compute="_compute_show_kyc_button",
+        store=False,
+        depends=["id_numbers", "id_numbers.category_id", "id_numbers.status"],
     )
 
     def _compute_show_kyc_button(self):
@@ -64,10 +67,12 @@ class ResPartner(models.Model):
                 kyc_records = partner.id_numbers.filtered(
                     lambda r: r.category_id == kyc_category and r.status == "open"
                 )
-                if kyc_records:
-                    valid_until_date = min(
-                        rec.valid_until for rec in kyc_records if rec.valid_until
-                    )
+                # Collect valid_until dates from records that have them
+                valid_dates = [
+                    rec.valid_until for rec in kyc_records if rec.valid_until
+                ]
+                if valid_dates:
+                    valid_until_date = min(valid_dates)
             partner.kyc_valid_until = valid_until_date
 
     def action_view_kyc_records(self):

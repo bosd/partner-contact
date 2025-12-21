@@ -11,5 +11,6 @@
         <field name="default_validity_unit">years</field>
         <field name="renewal_lead_number">2</field>
         <field name="renewal_lead_unit">months</field>
+        <field name="enable_on_child_contacts" eval="True" />
     </record>
 </odoo>
